@@ -1,25 +1,28 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Dashboard from "./pages/Dashboard";
-import CourseView from "./pages/CourseView";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Auth from './pages/Auth'; // Import Auth page
+import Dashboard from './pages/Dashboard'; // Import Dashboard page
+import CourseView from './pages/CourseView'; // Import CourseView page
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" />} />
+    <Router>
+      <div className="min-h-screen bg-gray-50 text-gray-800">
+        <Routes>
 
-        <Route path="/login" element={<Login />} />
+          {/* Connect Auth page */}
+          <Route path="/login" element={<Auth />} />
 
-        <Route path="/signup" element={<Signup />} />
+          <Route path="/dashboard" element={<Dashboard />} />
 
-        <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/course/:courseId" element={<CourseView />} />
 
-        <Route path="/course/:courseId" element={<CourseView />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Redirect all unknown routes to Login */}
+          <Route path="*" element={<Navigate to="/login" />} />
+
+        </Routes>
+      </div>
+    </Router>
   );
 }
 
