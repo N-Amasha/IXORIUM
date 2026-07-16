@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; 
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -75,6 +75,9 @@ const CourseView = () => {
   const [newModule, setNewModule] = useState({ title: '', textContent: '', audioUrl: '' });
   const [jargonInput, setJargonInput] = useState(''); 
   const [error, setError] = useState('');
+
+  const audioRef = useRef(null); // Control the audio player
+  const [speed, setSpeed] = useState(1); // Save current playback speed
 
   useEffect(() => {
     if (!token) return navigate('/login');
@@ -160,6 +163,13 @@ const CourseView = () => {
     } catch (err) {
       alert(err.response?.data?.msg || 'An error occurred.');
     }
+  };
+
+  const changeSpeed = (newSpeed) => {
+  if (audioRef.current) {
+    audioRef.current.playbackRate = newSpeed;
+    setSpeed(newSpeed);
+  }
   };
 
 
@@ -359,28 +369,43 @@ const CourseView = () => {
 
 
               {/* Audio Section */}
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+              <div className="rounded-xl bg-indigo-50 p-4 border border-indigo-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                  <h4 className="text-sm font-bold text-indigo-900">Voice Explanation</h4>
+                  
+                  {/* Playback Speed Buttons */}
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-indigo-200 w-fit">
+                    <span className="text-xs font-semibold text-gray-500 px-2">Speed:</span>
+                    {[1, 1.25, 1.5, 2].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => changeSpeed(s)}
+                        className={`px-2 py-0.5 text-xs font-bold rounded transition ${
+                          speed === s 
+                            ? 'bg-indigo-600 text-white' 
+                            : 'text-gray-600 hover:bg-indigo-100'
+                        }`}
+                      >
+                        {s}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-                <h4 className="mb-2 text-sm font-bold text-indigo-900">
-                  Teacher's Voice Explanation
-                </h4>
-
-
-                <audio
-                  key={selectedModule._id}
-                  controls
-                  className="mt-2 w-full"
+                {/* HTML5 Audio Player with ref */}
+                <audio 
+                  key={selectedModule._id} 
+                  ref={audioRef}
+                  controls 
+                  className="w-full mt-2"
+                  onPlay={() => {
+                    // When navigating to a different module or resuming playback, maintain the selected speed
+                    if(audioRef.current) audioRef.current.playbackRate = speed;
+                  }}
                 >
-
-                  <source
-                    src={selectedModule.audioUrl}
-                    type="audio/mp3"
-                  />
-
-                  Your browser does not support this audio player.
-
+                  <source src={selectedModule.audioUrl} type="audio/mp3" />
+                  Your browser does not support the audio element.
                 </audio>
-
               </div>
 
 
@@ -443,6 +468,7 @@ const CourseView = () => {
     </div>
   );
 };
+
 
 
 export default CourseView;
