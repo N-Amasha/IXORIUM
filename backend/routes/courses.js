@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
+
 const Course = require('../models/Course');
 const Module = require('../models/Module');
+
 const { protect, teacherOnly } = require('../middleware/authMiddleware');
 
 // === 1. COURSE ROUTES ===
@@ -49,24 +51,42 @@ router.get('/:courseId/modules', protect, async (req, res) => {
   }
 });
 
-// Allow only teachers to add a new module (Note + Voice) to a course
+// Allow only teachers to add a new module (Note + Voice + Jargon)
 router.post('/:courseId/modules', protect, teacherOnly, async (req, res) => {
+
   try {
-    const { title, textContent, audioUrl } = req.body;
+
+    const { 
+      title, 
+      textContent, 
+      audioUrl, 
+      jargon 
+    } = req.body;
+
 
     const newModule = new Module({
+
       course: req.params.courseId,
       title,
       textContent,
-      audioUrl // Currently, any audio link (MP3 URL) can be provided here
+      audioUrl,
+      jargon: jargon || {}
+
     });
 
+
     const savedModule = await newModule.save();
+
     res.status(201).json(savedModule);
 
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
+  } catch (err) {
+
+    res.status(500).json({
+      error: err.message
+    });
+
+  }
+
+});
 module.exports = router;

@@ -2,6 +2,64 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 
+const JargonTextFormatter = ({ text, jargonMap }) => {
+  if (!jargonMap || Object.keys(jargonMap).length === 0) return <>{text}</>;
+
+  // Convert jargon words into a Regex pattern (Example: \b(API|Backend)\b)
+  const escapedWords = Object.keys(jargonMap).map(w =>
+    w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+  );
+
+  const regex = new RegExp(`\\b(${escapedWords.join('|')})\\b`, 'gi');
+
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+
+        // Check whether the word exists in the jargon map
+        const matchedWord = Object.keys(jargonMap).find(
+          w => w.toLowerCase() === part.toLowerCase()
+        );
+
+
+        if (matchedWord) {
+
+          return (
+            <span
+              key={i}
+              className="relative group cursor-help border-b-2 border-dotted border-indigo-500 bg-indigo-50 px-1 font-semibold text-indigo-700 rounded transition hover:bg-indigo-100"
+            >
+
+              {part}
+
+
+              {/* Tooltip displayed when hovering */}
+              <span className="absolute bottom-full left-1/2 z-10 mb-2 w-48 -translate-x-1/2 scale-0 rounded-lg bg-gray-950 p-2 text-center text-xs font-normal text-white shadow-lg transition-all duration-150 group-hover:scale-100">
+
+                {jargonMap[matchedWord]}
+
+
+                {/* Tooltip arrow */}
+                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-950"></span>
+
+              </span>
+
+            </span>
+          );
+
+        }
+
+
+        return part;
+
+      })}
+    </>
+  );
+};
+
+
 const CourseView = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
@@ -15,6 +73,7 @@ const CourseView = () => {
 
   // New Module Form States (for teachers)
   const [newModule, setNewModule] = useState({ title: '', textContent: '', audioUrl: '' });
+  const [jargonInput, setJargonInput] = useState(''); 
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -60,26 +119,29 @@ const CourseView = () => {
 
   // Add a new module (Only for teachers)
   const handleCreateModule = async (e) => {
-    e.preventDefault();
-
-    try {
-      await axios.post(
-        `http://localhost:5000/api/courses/${courseId}/modules`,
-        newModule,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      setNewModule({ title: '', textContent: '', audioUrl: '' });
-
-      fetchModules();
-      fetchProgress(); // Update progress because module count changed
-
-    } catch (err) {
-      setError('Unable to add the module.');
+  e.preventDefault();
+  try {
+    // ExampleInput: API: Application Interface, Backend: Server-side logic
+    let parsedJargon = {};
+    if (jargonInput.trim()) {
+      jargonInput.split(',').forEach(pair => {
+        const [word, meaning] = pair.split(':');
+        if (word && meaning) parsedJargon[word.trim()] = meaning.trim();
+      });
     }
-  };
+
+    await axios.post(`http://localhost:5000/api/courses/${courseId}/modules`, 
+      { ...newModule, jargon: parsedJargon }, 
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    setNewModule({ title: '', textContent: '', audioUrl: '' });
+    setJargonInput('');
+    fetchModules();
+  } catch (err) {
+    setError('Failed to add the module.');
+  }
+};
 
 
   // Mark module as completed (Only for students)
@@ -238,6 +300,14 @@ const CourseView = () => {
 
                 <input
                   type="text"
+                  placeholder="Difficult words (Example: API:Application Programming Interface, Backend:Server side)"
+                  value={jargonInput}
+                  onChange={(e) => setJargonInput(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-indigo-500 focus:outline-none"
+                />
+
+                <input
+                  type="text"
                   placeholder="Audio Link (mp3 URL)"
                   required
                   value={newModule.audioUrl}
@@ -314,17 +384,15 @@ const CourseView = () => {
               </div>
 
 
-
-
               {/* Text Notes Section */}
               <div className="prose max-w-none whitespace-pre-wrap rounded-xl border border-gray-100 bg-slate-50 p-4 leading-relaxed text-gray-700">
 
-                {selectedModule.textContent}
+                <JargonTextFormatter
+                  text={selectedModule.textContent}
+                  jargonMap={selectedModule.jargon}
+                />
 
               </div>
-
-
-
 
 
               {/* Mark Complete Button */}
