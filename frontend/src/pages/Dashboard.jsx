@@ -7,6 +7,13 @@ const Dashboard = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  const [editingCourseId, setEditingCourseId] = useState(null);
+
+  const [editCourseData, setEditCourseData] = useState({
+    title: '',
+    description: ''
+  });
+
 
   // Get User and Token details from LocalStorage
   const token = localStorage.getItem('token');
@@ -52,6 +59,51 @@ const Dashboard = () => {
       setError('Unable to create the course.');
     }
   };
+
+  // Start editing course
+  const startEditingCourse = (course) => {
+
+    setEditingCourseId(course._id);
+
+    setEditCourseData({
+      title: course.title,
+      description: course.description
+    });
+
+  };
+
+
+
+  // Update course
+  const handleUpdateCourse = async (e, courseId)=>{
+
+    e.preventDefault();
+
+    try {
+
+      await axios.put(
+        `http://localhost:5000/api/courses/${courseId}`,
+        editCourseData,
+        {
+          headers:{
+            Authorization:`Bearer ${token}`
+          }
+        }
+      );
+
+
+      setEditingCourseId(null);
+
+      fetchCourses();
+
+
+    } catch(err){
+
+      setError("Failed to update course");
+
+    }
+
+};
 
   // Logout
   const handleLogout = () => {
@@ -153,41 +205,140 @@ const Dashboard = () => {
           }`}
         >
 
-          {courses.map((course) => (
+          {courses.map((course)=>{
+
+            const isEditingThis = editingCourseId === course._id;
+
+
+            return (
 
             <div
-              key={course._id}
-              className="flex flex-col justify-between rounded-xl bg-white p-6 shadow-sm transition hover:shadow-md"
+            key={course._id}
+            className="rounded-xl bg-white p-6 shadow-sm border"
             >
 
-              <div>
 
-                <h3 className="text-xl font-bold text-gray-800">
-                  {course.title}
-                </h3>
+            {isEditingThis ? (
 
-                <p className="mt-2 text-sm text-gray-600 line-clamp-3">
-                  {course.description}
-                </p>
-
-                <p className="mt-4 text-xs font-medium text-indigo-600">
-                  Teacher: {course.teacher?.name}
-                </p>
-
-              </div>
+            <form
+            onSubmit={(e)=>handleUpdateCourse(e,course._id)}
+            className="space-y-3"
+            >
 
 
-              <button
-                onClick={() => navigate(`/course/${course._id}`)}
-                className="mt-6 w-full rounded-lg bg-gray-800 py-2 text-center font-semibold text-white transition hover:bg-gray-900"
-              >
-                Go to Lessons →
-              </button>
+            <input
+            value={editCourseData.title}
+            onChange={(e)=>
+            setEditCourseData({
+            ...editCourseData,
+            title:e.target.value
+            })
+            }
+            className="w-full border p-2 rounded"
+            />
+
+
+
+            <textarea
+            value={editCourseData.description}
+            onChange={(e)=>
+            setEditCourseData({
+            ...editCourseData,
+            description:e.target.value
+            })
+            }
+            className="w-full border p-2 rounded"
+            />
+
+
+
+            <div className="flex gap-2">
+
+            <button
+            type="submit"
+            className="bg-green-600 text-white px-3 py-2 rounded"
+            >
+            Save
+            </button>
+
+
+            <button
+            type="button"
+            onClick={()=>setEditingCourseId(null)}
+            className="bg-gray-400 text-white px-3 py-2 rounded"
+            >
+            Cancel
+            </button>
 
 
             </div>
 
-          ))}
+
+            </form>
+
+
+            ):(
+
+
+            <>
+
+
+            <div className="flex justify-between">
+
+
+            <h3 className="text-xl font-bold">
+            {course.title}
+            </h3>
+
+
+
+            {user.role==="teacher" &&
+            user.id===course.teacher?._id &&
+
+            <button
+            onClick={()=>startEditingCourse(course)}
+            className="bg-yellow-200 px-3 py-1 rounded"
+            >
+            Edit
+            </button>
+
+            }
+
+
+            </div>
+
+
+            <p className="mt-3 text-gray-600">
+            {course.description}
+            </p>
+
+
+
+            <button
+
+            onClick={()=>
+            navigate(`/course/${course._id}`)
+            }
+
+            className="mt-5 w-full bg-gray-800 text-white py-2 rounded"
+
+            >
+            Go To Lessons →
+            </button>
+
+
+            </>
+
+
+            )}
+
+
+            </div>
+
+            );
+
+
+            })}
 
 
 

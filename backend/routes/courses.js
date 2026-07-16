@@ -116,4 +116,44 @@ router.put('/modules/:moduleId', protect, teacherOnly, async (req, res) => {
 });
 
 
+// Update Course (Teacher only)
+router.put('/:courseId', protect, teacherOnly, async (req, res) => {
+  try {
+
+    const { title, description } = req.body;
+
+    const updatedCourse = await Course.findOneAndUpdate(
+      {
+        _id: req.params.courseId,
+        teacher: req.user.id
+      },
+      {
+        title,
+        description
+      },
+      {
+        new: true
+      }
+    ).populate('teacher', 'name email');
+
+
+    if (!updatedCourse) {
+      return res.status(404).json({
+        msg: "Course not found or you don't have permission"
+      });
+    }
+
+
+    res.json(updatedCourse);
+
+
+  } catch (err) {
+
+    res.status(500).json({
+      error: err.message
+    });
+
+  }
+});
+
 module.exports = router;
