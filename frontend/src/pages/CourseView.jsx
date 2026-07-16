@@ -4,6 +4,23 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm'; 
 
+// Convert Google Drive URL into preview URL
+const getDirectDriveUrl = (url) => {
+  if (!url || !url.includes("drive.google.com")) {
+    return url;
+  }
+
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+
+  if (match && match[1]) {
+    const fileId = match[1];
+
+    return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  }
+
+  return url;
+};
+
 const JargonTextFormatter = ({ text, jargonMap }) => {
 
   if (!jargonMap || Object.keys(jargonMap).length === 0) {
@@ -85,6 +102,8 @@ const CourseView = () => {
   const [progress, setProgress] = useState({ progressPercentage: 0, completedModuleIds: [] });
   const [isEditing, setIsEditing] = useState(false);
 
+  const [uploading, setUploading] = useState(false);
+
   const [editData, setEditData] = useState({
     title: "",
     textContent: "",
@@ -163,8 +182,9 @@ const CourseView = () => {
     setJargonInput('');
     fetchModules();
   } catch (err) {
+    console.log("MODULE CREATE ERROR:", err.response?.data || err.message);
     setError('Failed to add the module.');
-  }
+}
 };
 
 
@@ -242,6 +262,67 @@ const CourseView = () => {
       setError("Failed to update module.");
     }
   };
+
+  const handleFileUpload = async (file, type) => {
+
+  if (!file) return;
+
+  setUploading(true);
+
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+
+  try {
+
+    const res = await axios.post(
+      "http://localhost:5000/api/upload",
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    );
+
+
+    console.log("Cloudinary URL:", res.data.url);
+
+
+    if(type === "audio"){
+      setNewModule({
+        ...newModule,
+        audioUrl: res.data.url
+      });
+    }
+
+
+    if(type === "image"){
+
+      setNewModule({
+        ...newModule,
+        textContent:
+        `${newModule.textContent}\n\n![Lesson Image](${res.data.url})`
+      });
+
+    }
+
+
+  } catch(error){
+
+    console.log(
+      "Upload failed:",
+      error.response?.data || error.message
+    );
+
+  }
+
+
+  setUploading(false);
+
+};
 
   const changeSpeed = (newSpeed) => {
   if (audioRef.current) {
@@ -395,15 +476,33 @@ const CourseView = () => {
                 />
 
                 <input
-                  type="text"
-                  placeholder="Audio Link (mp3 URL)"
-                  required
-                  value={newModule.audioUrl}
-                  onChange={(e) =>
-                    setNewModule({ ...newModule, audioUrl: e.target.value })
-                  }
-                  className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-indigo-500 focus:outline-none"
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => handleFileUpload(e.target.files[0], "audio")}
+                  className="w-full rounded-lg border p-2"
                 />
+
+                  {uploading && (
+                    <p className="text-sm text-indigo-600">
+                      Uploading audio...
+                    </p>
+                  )}
+
+                  {newModule.audioUrl && newModule.audioUrl !== "" && (
+                    <audio controls className="w-full mt-2">
+                      <source 
+                      src={newModule.audioUrl || null}
+                      type="audio/mpeg"
+                      />
+                    </audio>
+                  )}
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e.target.files[0], "image")}
+                    className="w-full rounded-lg border p-2"
+                  />
 
 
                 <button
@@ -556,8 +655,11 @@ const CourseView = () => {
                     if(audioRef.current) audioRef.current.playbackRate = speed;
                   }}
                 >
-                  <source src={selectedModule.audioUrl} type="audio/mp3" />
-                  Your browser does not support the audio element.
+                  <source 
+                    src={getDirectDriveUrl(selectedModule.audioUrl)} 
+                    type="audio/mpeg" 
+                  />
+                      Your browser does not support the audio element.
                 </audio>
               </div>
 
@@ -590,48 +692,38 @@ const CourseView = () => {
                   // Paragraphs + Jargon Tooltip
                   p: ({ children }) => {
 
-                  const hasImage = Array.isArray(children) &&
-                    children.some(child => child?.type === "img");
+                    return (
+                      <p className="mb-4">
+                        {typeof children === "string" ? (
+                          <JargonTextFormatter
+                            text={children}
+                            jargonMap={selectedModule.jargon || {}}
+                          />
+                        ) : (
+                          children
+                        )}
+                      </p>
+                    );
 
-
-                  if (hasImage) {
-                    return <>{children}</>;
-                  }
-
-
-                  return (
-                    <p className="mb-4">
-                      {typeof children === "string" ? (
-                        <JargonTextFormatter
-                          text={children}
-                          jargonMap={selectedModule.jargon || {}}
-                        />
-                      ) : (
-                        children
-                      )}
-                    </p>
-                  );
-                },
+                  },
 
                   // Images
                   img: ({ node, ...props }) => (
-                    <div className="my-4 flex flex-col items-center">
+                  <>
+                    <img
+                      {...props}
+                      src={getDirectDriveUrl(props.src)}
+                      className="rounded-xl shadow-md max-h-96 object-contain border border-gray-200 my-4"
+                      alt={props.alt || "Lesson Image"}
+                    />
 
-                      <img
-                        {...props}
-                        className="rounded-xl shadow-md max-h-96 object-contain border border-gray-200"
-                        alt={props.alt || "Lesson Image"}
-                      />
-
-                      {props.alt && (
-                        <span className="text-xs text-gray-500 mt-2">
-                          Image: {props.alt}
-                        </span>
-                      )}
-
-                    </div>
-                  ),
-
+                    {props.alt && (
+                      <span className="block text-xs text-gray-500 mt-2">
+                        Image: {props.alt}
+                      </span>
+                    )}
+                </>
+              ),
 
                   // YouTube Embed
                   a: ({ node, ...props }) => {

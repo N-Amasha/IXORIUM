@@ -17,9 +17,10 @@ const ModuleSchema = new mongoose.Schema({
     required:true
   },
 
-  audioUrl:{
-    type:String,
-    required:true
+  audioUrl: {
+    type: String,
+    required: false,
+    default: ""
   },
 
   // Stores difficult words and meanings

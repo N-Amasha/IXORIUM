@@ -32,9 +32,12 @@ router.post('/', protect, teacherOnly, async (req, res) => {
     const savedCourse = await newCourse.save();
     res.status(201).json(savedCourse);
 
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch(err){
+    console.log("CREATE MODULE ERROR:", err.message);
+    res.status(500).json({
+        error: err.message
+    });
+}
 });
 
 
