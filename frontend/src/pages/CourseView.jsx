@@ -1,9 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react'; 
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm'; 
 
 const JargonTextFormatter = ({ text, jargonMap }) => {
-  if (!jargonMap || Object.keys(jargonMap).length === 0) return <>{text}</>;
+
+  if (!jargonMap || Object.keys(jargonMap).length === 0) {
+    return text;
+  }
+
+  // Convert React children array into normal text
+  if (Array.isArray(text)) {
+    text = text.join('');
+  }
+
+  if (typeof text !== "string") {
+    return text;
+  }
+
+  if (!jargonMap || Object.keys(jargonMap).length === 0) {
+    return text;
+  }
 
   // Convert jargon words into a Regex pattern (Example: \b(API|Backend)\b)
   const escapedWords = Object.keys(jargonMap).map(w =>
@@ -59,6 +77,24 @@ const JargonTextFormatter = ({ text, jargonMap }) => {
   );
 };
 
+const getYoutubeId = (url) => {
+  const regex = /(?:youtube\.com\/.*v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/;
+  return url.match(regex)?.[1];
+};
+
+const extractText = (children) => {
+  if (typeof children === "string") {
+    return children;
+  }
+
+  if (Array.isArray(children)) {
+    return children
+      .map((child) => extractText(child))
+      .join("");
+  }
+
+  return "";
+};
 
 const CourseView = () => {
   const { courseId } = useParams();
@@ -409,14 +445,143 @@ const CourseView = () => {
               </div>
 
 
-              {/* Text Notes Section */}
-              <div className="prose max-w-none whitespace-pre-wrap rounded-xl border border-gray-100 bg-slate-50 p-4 leading-relaxed text-gray-700">
+              {/* Text Notes Section - Markdown, Images, Videos and Jargon */}
+              <div className="prose max-w-none text-gray-700 leading-relaxed bg-slate-50 p-6 rounded-xl border border-gray-100">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                  // Headings
+                  h1: ({ children }) => (
+                    <h1 className="text-3xl font-bold my-4 text-gray-900">
+                      {children}
+                    </h1>
+                  ),
 
-                <JargonTextFormatter
-                  text={selectedModule.textContent}
-                  jargonMap={selectedModule.jargon}
-                />
+                  h2: ({ children }) => (
+                    <h2 className="text-2xl font-bold my-3 text-gray-900">
+                      {children}
+                    </h2>
+                  ),
 
+                  h3: ({ children }) => (
+                    <h3 className="text-xl font-semibold my-3 text-gray-800">
+                      {children}
+                    </h3>
+                  ),
+
+
+                  // Paragraphs + Jargon Tooltip
+                  p: ({ children }) => {
+
+                  const hasImage = Array.isArray(children) &&
+                    children.some(child => child?.type === "img");
+
+
+                  if (hasImage) {
+                    return <>{children}</>;
+                  }
+
+
+                  return (
+                    <p className="mb-4">
+                      {typeof children === "string" ? (
+                        <JargonTextFormatter
+                          text={children}
+                          jargonMap={selectedModule.jargon || {}}
+                        />
+                      ) : (
+                        children
+                      )}
+                    </p>
+                  );
+                },
+
+                  // Images
+                  img: ({ node, ...props }) => (
+                    <div className="my-4 flex flex-col items-center">
+
+                      <img
+                        {...props}
+                        className="rounded-xl shadow-md max-h-96 object-contain border border-gray-200"
+                        alt={props.alt || "Lesson Image"}
+                      />
+
+                      {props.alt && (
+                        <span className="text-xs text-gray-500 mt-2">
+                          Image: {props.alt}
+                        </span>
+                      )}
+
+                    </div>
+                  ),
+
+
+                  // YouTube Embed
+                  a: ({ node, ...props }) => {
+
+                  const url = props.href || "";
+
+
+                  if (
+                    url.includes("youtube.com/watch") ||
+                    url.includes("youtu.be")
+                  ) {
+
+                    const extractYoutubeId = (url) => {
+
+                      const regex =
+                        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/;
+
+                      const match = url.match(regex);
+
+                      return match ? match[1] : null;
+                    };
+
+
+                    const youtubeId = extractYoutubeId(url);
+
+
+                    if (!youtubeId) {
+                      return (
+                        <a href={url}>
+                          {props.children}
+                        </a>
+                      );
+                    }
+
+
+                    return (
+                      <div className="my-6 aspect-video w-full rounded-xl overflow-hidden shadow-lg">
+
+                        <iframe
+                          src={`https://www.youtube.com/embed/${youtubeId}`}
+                          title="Lesson Video"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          className="w-full h-full"
+                        />
+
+                      </div>
+                    );
+
+                  }
+
+
+                  return (
+                    <a
+                      {...props}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:underline"
+                    >
+                      {props.children}
+                    </a>
+                  );
+                }
+                }}
+                >
+                  {selectedModule.textContent}
+                </ReactMarkdown>
               </div>
 
 
