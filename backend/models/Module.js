@@ -23,6 +23,12 @@ const ModuleSchema = new mongoose.Schema({
     default: ""
   },
 
+  imageUrl: {
+    type: String,
+    required: false,
+    default: ""
+  },
+
   // Stores difficult words and meanings
   jargon:{
     type:Map,

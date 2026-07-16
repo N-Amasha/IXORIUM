@@ -159,4 +159,52 @@ router.put('/:courseId', protect, teacherOnly, async (req, res) => {
   }
 });
 
+router.delete('/:courseId', protect, teacherOnly, async (req, res) => {
+  try {
+    const course = await Course.findOneAndDelete({
+      _id: req.params.courseId,
+      teacher: req.user.id
+    });
+
+    if (!course)
+      return res.status(404).json({
+        msg: 'Course not found or you are not allowed to delete it.'
+      });
+
+    await Module.deleteMany({
+      _id: { $in: course.modules }
+    });
+
+    res.json({
+      msg: 'Course and all modules deleted successfully.'
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      error: err.message
+    });
+  }
+});
+
+router.delete('/modules/:moduleId', protect, teacherOnly, async (req, res) => {
+  try {
+
+    const deletedModule = await Module.findByIdAndDelete(req.params.moduleId);
+
+    if (!deletedModule)
+      return res.status(404).json({
+        msg: 'Module not found.'
+      });
+
+    res.json({
+      msg: 'Module deleted successfully.'
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      error: err.message
+    });
+  }
+});
+
 module.exports = router;

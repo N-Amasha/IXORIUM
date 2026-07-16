@@ -72,7 +72,33 @@ const Dashboard = () => {
 
   };
 
+const handleDeleteCourse = async (courseId) => {
 
+  if (
+    !window.confirm(
+      "Are you sure you want to delete this course and all its lessons?"
+    )
+  )
+    return;
+
+  try {
+
+    await axios.delete(
+      `http://localhost:5000/api/courses/${courseId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    fetchCourses();
+
+  } catch (err) {
+    setError("Failed to delete course.");
+  }
+
+};
 
   // Update course
   const handleUpdateCourse = async (e, courseId)=>{
@@ -292,17 +318,25 @@ const Dashboard = () => {
 
 
 
-            {user.role==="teacher" &&
-            user.id===course.teacher?._id &&
+            {user.role === 'teacher' && user.id === course.teacher?._id && (
+              <div className="flex gap-2">
 
-            <button
-            onClick={()=>startEditingCourse(course)}
-            className="bg-yellow-200 px-3 py-1 rounded"
-            >
-            Edit
-            </button>
+                <button
+                  onClick={() => startEditingCourse(course)}
+                  className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold px-2.5 py-1 rounded transition"
+                >
+                  Edit
+                </button>
 
-            }
+                <button
+                  onClick={() => handleDeleteCourse(course._id)}
+                  className="text-xs bg-red-100 hover:bg-red-200 text-red-700 font-bold px-2.5 py-1 rounded transition"
+                >
+                  Delete
+                </button>
+
+              </div>
+            )}
 
 
             </div>

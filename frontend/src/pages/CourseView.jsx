@@ -105,10 +105,11 @@ const CourseView = () => {
   const [uploading, setUploading] = useState(false);
 
   const [editData, setEditData] = useState({
-    title: "",
-    textContent: "",
-    audioUrl: "",
-    jargonInput: ""
+      title: "",
+      textContent: "",
+      audioUrl: "",
+      imageUrl: "",
+      jargonInput: ""
   });
 
   // New Module Form States (for teachers)
@@ -215,11 +216,43 @@ const CourseView = () => {
       title: selectedModule.title,
       textContent: selectedModule.textContent,
       audioUrl: selectedModule.audioUrl,
+      imageUrl: selectedModule.imageUrl || "",
       jargonInput: jargonString
     });
 
     setIsEditing(true);
   };
+
+
+  const handleDeleteModule = async (moduleId) => {
+
+      if (
+        !window.confirm(
+          "Are you sure you want to delete this lesson?"
+        )
+      )
+        return;
+
+      try {
+
+        await axios.delete(
+          `http://localhost:5000/api/courses/modules/${moduleId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        setSelectedModule(null);
+
+        fetchModules();
+
+      } catch (err) {
+        setError("Failed to delete module.");
+      }
+
+    };
 
   const handleUpdateModule = async (e) => {
     e.preventDefault();
@@ -243,6 +276,7 @@ const CourseView = () => {
           title: editData.title,
           textContent: editData.textContent,
           audioUrl: editData.audioUrl,
+          imageUrl: editData.imageUrl,
           jargon: parsedJargon
         },
         {
@@ -263,11 +297,9 @@ const CourseView = () => {
     }
   };
 
-  const handleFileUpload = async (file, type) => {
+const handleFileUpload = async (file) => {
 
-  if (!file) return;
-
-  setUploading(true);
+  
 
   const formData = new FormData();
 
@@ -288,26 +320,9 @@ const CourseView = () => {
     );
 
 
-    console.log("Cloudinary URL:", res.data.url);
+    console.log("Upload Response:", res.data);
 
-
-    if(type === "audio"){
-      setNewModule({
-        ...newModule,
-        audioUrl: res.data.url
-      });
-    }
-
-
-    if(type === "image"){
-
-      setNewModule({
-        ...newModule,
-        textContent:
-        `${newModule.textContent}\n\n![Lesson Image](${res.data.url})`
-      });
-
-    }
+    return res.data.url;
 
 
   } catch(error){
@@ -317,8 +332,38 @@ const CourseView = () => {
       error.response?.data || error.message
     );
 
+    return null;
   }
+  
 
+};
+
+const handleEditUpload = async (file, type) => {
+
+  if (!file) return;
+
+  setUploading(true);
+
+  const url = await handleFileUpload(file);
+
+  if (url) {
+
+    if (type === "audio") {
+      setEditData(prev => ({
+        ...prev,
+        audioUrl: url
+      }));
+    }
+
+
+    if (type === "image") {
+      setEditData(prev => ({
+        ...prev,
+        imageUrl: url
+      }));
+    }
+
+  }
 
   setUploading(false);
 
@@ -478,7 +523,20 @@ const CourseView = () => {
                 <input
                   type="file"
                   accept="audio/*"
-                  onChange={(e) => handleFileUpload(e.target.files[0], "audio")}
+                  onChange={async (e)=>{
+
+                    const url = await handleFileUpload(e.target.files[0]);
+
+                    if(url){
+
+                    setNewModule(prev=>({
+                      ...prev,
+                      audioUrl:url
+                    }));
+
+                    }
+
+                  }}
                   className="w-full rounded-lg border p-2"
                 />
 
@@ -500,7 +558,24 @@ const CourseView = () => {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => handleFileUpload(e.target.files[0], "image")}
+                    onChange={async (e) => {
+
+                      setUploading(true);
+
+                      const url = await handleFileUpload(e.target.files[0]);
+
+                      if (url) {
+                        setNewModule(prev => ({
+                          ...prev,
+                          textContent:
+                            prev.textContent +
+                            `\n\n![Lesson Image](${url})`
+                        }));
+                      }
+
+                      setUploading(false);
+
+                    }}
                     className="w-full rounded-lg border p-2"
                   />
 
@@ -540,12 +615,23 @@ const CourseView = () => {
           </h2>
 
           {user.role === "teacher" && !isEditing && (
-            <button
-              onClick={startEditing}
-              className="rounded-lg bg-amber-500 px-4 py-2 text-white hover:bg-amber-600"
-            >
-              Edit Lesson
-            </button>
+            <div className="flex gap-2">
+
+              <button
+                onClick={startEditing}
+                className="rounded-lg bg-amber-500 px-4 py-2 text-white hover:bg-amber-600 font-medium text-sm transition shadow-sm"
+              >
+                Edit Lesson
+              </button>
+
+              <button
+                onClick={() => handleDeleteModule(selectedModule._id)}
+                className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 font-medium text-sm transition shadow-sm"
+              >
+                🗑️ Delete Lesson
+              </button>
+
+            </div>
           )}
 
         </div>
@@ -577,15 +663,57 @@ const CourseView = () => {
               className="w-full rounded border p-2"
             />
 
-            <input
-              type="text"
-              value={editData.audioUrl}
-              onChange={(e) =>
-                setEditData({ ...editData, audioUrl: e.target.value })
-              }
-              className="w-full rounded border p-2"
+            <label className="font-semibold">
+            Audio Explanation
+            </label>
+
+
+            {editData.audioUrl && (
+
+            <audio controls className="w-full">
+
+            <source
+            src={editData.audioUrl}
+            type="audio/mpeg"
             />
 
+            </audio>
+
+            )}
+
+
+            <input
+            type="file"
+            accept="audio/*"
+            onChange={(e)=>
+            handleEditUpload(e.target.files[0],"audio")
+            }
+            className="w-full border p-2"
+            />
+          <label className="font-semibold">
+          Lesson Image
+          </label>
+
+
+          {editData.imageUrl && (
+
+          <img
+          src={editData.imageUrl}
+          alt="Lesson"
+          className="w-full max-h-80 object-contain rounded-lg border"
+          />
+
+          )}
+
+
+          <input
+          type="file"
+          accept="image/*"
+          onChange={(e)=>
+          handleEditUpload(e.target.files[0],"image")
+          }
+          className="w-full border p-2"
+          />
             <input
               type="text"
               value={editData.jargonInput}
@@ -656,8 +784,12 @@ const CourseView = () => {
                   }}
                 >
                   <source 
-                    src={getDirectDriveUrl(selectedModule.audioUrl)} 
-                    type="audio/mpeg" 
+                      src={
+                      selectedModule.audioUrl 
+                      ? getDirectDriveUrl(selectedModule.audioUrl)
+                      : null
+                      }
+                      type="audio/mpeg"
                   />
                       Your browser does not support the audio element.
                 </audio>
