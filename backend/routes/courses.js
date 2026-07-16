@@ -89,4 +89,31 @@ router.post('/:courseId/modules', protect, teacherOnly, async (req, res) => {
   }
 
 });
+
+router.put('/modules/:moduleId', protect, teacherOnly, async (req, res) => {
+  try {
+    const { title, textContent, audioUrl, jargon } = req.body;
+
+    const updatedModule = await Module.findByIdAndUpdate(
+      req.params.moduleId,
+      {
+        title,
+        textContent,
+        audioUrl,
+        jargon: jargon || {}
+      },
+      { new: true }
+    );
+
+    if (!updatedModule) {
+      return res.status(404).json({ msg: 'Module not found' });
+    }
+
+    res.json(updatedModule);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 module.exports = router;

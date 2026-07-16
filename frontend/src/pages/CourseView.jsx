@@ -19,10 +19,6 @@ const JargonTextFormatter = ({ text, jargonMap }) => {
     return text;
   }
 
-  if (!jargonMap || Object.keys(jargonMap).length === 0) {
-    return text;
-  }
-
   // Convert jargon words into a Regex pattern (Example: \b(API|Backend)\b)
   const escapedWords = Object.keys(jargonMap).map(w =>
     w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
@@ -77,25 +73,6 @@ const JargonTextFormatter = ({ text, jargonMap }) => {
   );
 };
 
-const getYoutubeId = (url) => {
-  const regex = /(?:youtube\.com\/.*v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/;
-  return url.match(regex)?.[1];
-};
-
-const extractText = (children) => {
-  if (typeof children === "string") {
-    return children;
-  }
-
-  if (Array.isArray(children)) {
-    return children
-      .map((child) => extractText(child))
-      .join("");
-  }
-
-  return "";
-};
-
 const CourseView = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
@@ -106,6 +83,14 @@ const CourseView = () => {
   const [modules, setModules] = useState([]);
   const [selectedModule, setSelectedModule] = useState(null);
   const [progress, setProgress] = useState({ progressPercentage: 0, completedModuleIds: [] });
+  const [isEditing, setIsEditing] = useState(false);
+
+  const [editData, setEditData] = useState({
+    title: "",
+    textContent: "",
+    audioUrl: "",
+    jargonInput: ""
+  });
 
   // New Module Form States (for teachers)
   const [newModule, setNewModule] = useState({ title: '', textContent: '', audioUrl: '' });
@@ -198,6 +183,63 @@ const CourseView = () => {
 
     } catch (err) {
       alert(err.response?.data?.msg || 'An error occurred.');
+    }
+  };
+
+  const startEditing = () => {
+  const jargonString = Object.entries(selectedModule.jargon || {})
+      .map(([word, meaning]) => `${word}:${meaning}`)
+      .join(", ");
+
+    setEditData({
+      title: selectedModule.title,
+      textContent: selectedModule.textContent,
+      audioUrl: selectedModule.audioUrl,
+      jargonInput: jargonString
+    });
+
+    setIsEditing(true);
+  };
+
+  const handleUpdateModule = async (e) => {
+    e.preventDefault();
+
+    try {
+      let parsedJargon = {};
+
+      if (editData.jargonInput.trim()) {
+        editData.jargonInput.split(",").forEach(pair => {
+          const [word, meaning] = pair.split(":");
+
+          if (word && meaning) {
+            parsedJargon[word.trim()] = meaning.trim();
+          }
+        });
+      }
+
+    const res = await axios.put(
+        `http://localhost:5000/api/courses/modules/${selectedModule._id}`,
+        {
+          title: editData.title,
+          textContent: editData.textContent,
+          audioUrl: editData.audioUrl,
+          jargon: parsedJargon
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      setSelectedModule(res.data);
+
+      fetchModules();
+
+      setIsEditing(false);
+
+    } catch (err) {
+      setError("Failed to update module.");
     }
   };
 
@@ -387,25 +429,100 @@ const CourseView = () => {
         {/* Right Side: Main Content Area */}
         <div className="lg:col-span-3">
 
-          {selectedModule ? (
+                  {selectedModule ? (
 
-            <div className="space-y-6 rounded-xl bg-white p-6 shadow-sm">
-
-
-              <div>
-
-                <h2 className="text-3xl font-bold text-gray-800">
-                  {selectedModule.title}
-                </h2>
-
-                <hr className="mt-4 border-gray-200" />
-
-              </div>
+                    <div className="space-y-6 rounded-xl bg-white p-6 shadow-sm">
 
 
+                      <div className="flex items-center justify-between">
 
-              {/* Audio Section */}
-              <div className="rounded-xl bg-indigo-50 p-4 border border-indigo-100">
+          <h2 className="text-3xl font-bold text-gray-800">
+            {selectedModule.title}
+          </h2>
+
+          {user.role === "teacher" && !isEditing && (
+            <button
+              onClick={startEditing}
+              className="rounded-lg bg-amber-500 px-4 py-2 text-white hover:bg-amber-600"
+            >
+              Edit Lesson
+            </button>
+          )}
+
+        </div>
+
+      <hr className="mt-4 border-gray-200" />
+
+      {isEditing ? (
+
+          <form
+            onSubmit={handleUpdateModule}
+            className="space-y-4 rounded-xl border bg-gray-50 p-5"
+          >
+
+            <input
+              type="text"
+              value={editData.title}
+              onChange={(e) =>
+                setEditData({ ...editData, title: e.target.value })
+              }
+              className="w-full rounded border p-2"
+            />
+
+            <textarea
+              rows="10"
+              value={editData.textContent}
+              onChange={(e) =>
+                setEditData({ ...editData, textContent: e.target.value })
+              }
+              className="w-full rounded border p-2"
+            />
+
+            <input
+              type="text"
+              value={editData.audioUrl}
+              onChange={(e) =>
+                setEditData({ ...editData, audioUrl: e.target.value })
+              }
+              className="w-full rounded border p-2"
+            />
+
+            <input
+              type="text"
+              value={editData.jargonInput}
+              onChange={(e) =>
+                setEditData({ ...editData, jargonInput: e.target.value })
+              }
+              className="w-full rounded border p-2"
+            />
+
+            <div className="flex gap-3">
+
+              <button
+                type="submit"
+                className="rounded bg-green-600 px-4 py-2 text-white"
+              >
+                Save Changes
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="rounded bg-gray-500 px-4 py-2 text-white"
+              >
+                Cancel
+              </button>
+
+            </div>
+
+          </form>
+
+          ) : (
+
+          <>
+
+            {/* Audio Section */}
+            <div className="rounded-xl bg-indigo-50 p-4 border border-indigo-100">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                   <h4 className="text-sm font-bold text-indigo-900">Voice Explanation</h4>
                   
@@ -601,7 +718,7 @@ const CourseView = () => {
 
 
 
-              {progress.completedModuleIds?.includes(selectedModule._id) && (
+                {progress.completedModuleIds?.includes(selectedModule._id) && (
 
                 <div className="w-full rounded-lg border border-green-200 bg-green-100 py-3 text-center font-semibold text-green-700">
 
@@ -611,12 +728,13 @@ const CourseView = () => {
 
               )}
 
+            </>
+          )}
 
-            </div>
+        </div>
 
-
-          ) : (
-
+      ) : (
+            
             <div className="rounded-xl bg-white p-12 text-center text-gray-500 shadow-sm">
 
               No modules have been added to this course yet.
